@@ -1,0 +1,196 @@
+{
+  "info": {
+    "name": "LiveKit Controller API",
+    "description": "Collection of API endpoints for LiveKit server control",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "roomName",
+      "value": "test-room",
+      "type": "string"
+    },
+    {
+      "key": "participantName",
+      "value": "john-doe",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Server Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/livekit/info",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "info"]
+        },
+        "description": "Get LiveKit server connection information"
+      }
+    },
+    {
+      "name": "Create Room",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{roomName}}\",\n  \"emptyTimeout\": 300,\n  \"maxParticipants\": 10\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/livekit/rooms",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "rooms"]
+        },
+        "description": "Create a new LiveKit room"
+      }
+    },
+    {
+      "name": "List All Rooms",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/livekit/rooms",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "rooms"]
+        },
+        "description": "Get a list of all active rooms"
+      }
+    },
+    {
+      "name": "Get Room Details",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/livekit/rooms/{{roomName}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "rooms", "{{roomName}}"]
+        },
+        "description": "Get details of a specific room"
+      }
+    },
+    {
+      "name": "Update Room",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"maxParticipants\": 20,\n  \"emptyTimeout\": 600\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/livekit/rooms/{{roomName}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "rooms", "{{roomName}}"]
+        },
+        "description": "Update room settings"
+      }
+    },
+    {
+      "name": "Delete Room",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/livekit/rooms/{{roomName}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "rooms", "{{roomName}}"]
+        },
+        "description": "Delete a room"
+      }
+    },
+    {
+      "name": "Create Access Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"roomName\": \"{{roomName}}\",\n  \"participantName\": \"{{participantName}}\",\n  \"metadata\": \"Test user metadata\",\n  \"canPublish\": true,\n  \"canSubscribe\": true,\n  \"canPublishData\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/livekit/token",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "token"]
+        },
+        "description": "Generate an access token for a participant to join a room"
+      }
+    },
+    {
+      "name": "List Participants",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/livekit/rooms/{{roomName}}/participants",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "rooms", "{{roomName}}", "participants"]
+        },
+        "description": "List all participants in a room"
+      }
+    },
+    {
+      "name": "Remove Participant",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/livekit/rooms/{{roomName}}/participants/{{participantName}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "rooms", "{{roomName}}", "participants", "{{participantName}}"]
+        },
+        "description": "Remove a participant from a room"
+      }
+    },
+    {
+      "name": "Mute Participant Track",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/livekit/rooms/{{roomName}}/participants/{{participantName}}/mute?trackSid=TR_XXXXX&muted=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["livekit", "rooms", "{{roomName}}", "participants", "{{participantName}}", "mute"],
+          "query": [
+            {
+              "key": "trackSid",
+              "value": "TR_XXXXX",
+              "description": "Track SID to mute"
+            },
+            {
+              "key": "muted",
+              "value": "true",
+              "description": "true to mute, false to unmute"
+            }
+          ]
+        },
+        "description": "Mute or unmute a participant's track"
+      }
+    }
+  ]
+}
+

@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LiveKit Test Client</title>
+    <script
+      src="https://unpkg.com/livekit-client@1.15.0/dist/livekit-client.umd.js"
+      onerror="
+        console.error('Failed to load LiveKit client library from unpkg');
+        loadLivekitFallback();
+      "
+      onload="
+        console.log(
+          'LiveKit client library loaded from unpkg:',
+          typeof LivekitClient !== 'undefined' ? 'Success' : 'Failed'
+        )
+      "
+    ></script>
+    <script>
+      // Fallback loader
+      function loadLivekitFallback() {
+        console.log("Trying fallback CDN (jsDelivr)...");
+        const script = document.createElement("script");
+        script.src =
+          "https://cdn.jsdelivr.net/npm/livekit-client@1.15.13/dist/livekit-client.umd.js";
+        script.onload = function () {
+          console.log(
+            "LiveKit client loaded from jsDelivr:",
+            typeof LivekitClient !== "undefined" ? "Success" : "Failed"
+          );
+        };
+        script.onerror = function () {
+          console.error("Failed to load from jsDelivr as well");
+          alert(
+            "Failed to load LiveKit client library. Please check your internet connection."
+          );
+        };
+        document.head.appendChild(script);
+      }
+    </script>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 1200px;
+        margin: 50px auto;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #333;
+      }
+      .container {
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      }
+      h1 {
+        color: #667eea;
+        margin-bottom: 10px;
+      }
+      .section {
+        margin: 20px 0;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+      }
+      input,
+      button {
+        padding: 10px 15px;
+        margin: 5px;
+        border: 2px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      input {
+        flex: 1;
+        min-width: 200px;
+      }
+      button {
+        background: #667eea;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+      }
+      button:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .form-group {
+        display: flex;
+        align-items: center;
+        margin: 10px 0;
+        flex-wrap: wrap;
+      }
+      label {
+        min-width: 120px;
+        font-weight: 600;
+        color: #555;
+      }
+      #status {
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 6px;
+        font-weight: 600;
+      }
+      .status-disconnected {
+        background: #fee;
+        color: #c33;
+        border: 2px solid #fcc;
+      }
+      .status-connected {
+        background: #efe;
+        color: #3c3;
+        border: 2px solid #cfc;
+      }
+      .status-connecting {
+        background: #ffeaa7;
+        color: #d63031;
+        border: 2px solid #fdcb6e;
+      }
+      #videos {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .video-container {
+        position: relative;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+      video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .participant-name {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      .info {
+        background: #e3f2fd;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 10px 0;
+        border-left: 4px solid #2196f3;
+      }
+      .info code {
+        background: #fff;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+        color: #d63031;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎥 LiveKit Test Client2</h1>
+      <p style="color: #666">
+        Connect to your LiveKit room using the controller API
+      </p>
+
+      <div class="section">
+        <h3>Step 1: Create Room & Get Token</h3>
+        <div class="info">
+          First, create a room using the API. You can use the provided test
+          script or run:
+          <br /><br />
+          <code
+            >curl -X POST http://localhost:3000/livekit/rooms -H "Content-Type:
+            application/json" -d '{"name": "my-room"}'</code
+          >
+        </div>
+
+        <div class="form-group">
+          <label>Room Name:</label>
+          <input
+            type="text"
+            id="roomName"
+            value="my-room"
+            placeholder="Enter room name"
+          />
+        </div>
+        <div class="form-group">
+          <label>Your Name:</label>
+          <input
+            type="text"
+            id="participantName"
+            value="User"
+            placeholder="Enter your name"
+          />
+        </div>
+        <button onclick="getTokenAndConnect()">Get Token & Connect</button>
+      </div>
+
+      <div class="section">
+        <h3>Step 2: Or Connect with Existing Token</h3>
+        <div class="form-group">
+          <label>Server URL:</label>
+          <input
+            type="text"
+            id="serverUrl"
+            value=""
+            placeholder="LiveKit server URL (auto-detected)"
+          />
+        </div>
+        <div class="form-group">
+          <label>Access Token:</label>
+          <input
+            type="text"
+            id="token"
+            placeholder="Paste your access token here"
+          />
+        </div>
+        <button onclick="connectWithToken()">Connect with Token</button>
+        <button onclick="disconnect()" id="disconnectBtn" disabled>
+          Disconnect
+        </button>
+      </div>
+
+      <div id="status" class="status-disconnected">Status: Disconnected</div>
+      <div
+        id="library-status"
+        style="
+          padding: 10px;
+          margin: 10px 0;
+          background: #fff3cd;
+          border-radius: 6px;
+          display: none;
+        "
+      >
+        <strong>⚠️ Library Status:</strong>
+        <span id="library-status-text">Checking...</span>
+      </div>
+
+      <div class="section">
+        <h3>Participants & Videos</h3>
+        <div id="videos"></div>
+      </div>
+    </div>
+
+    <script>
+      // Auto-detect the server URL based on current hostname
+      // This allows the client to work on both localhost and network IP
+      const getServerHost = () => {
+        const hostname = window.location.hostname;
+        // If accessing via localhost, try to use localhost
+        // Otherwise use the current hostname (which could be IP address)
+        return hostname === "localhost" || hostname === "127.0.0.1"
+          ? "localhost"
+          : hostname;
+      };
+
+      const SERVER_HOST = getServerHost();
+      const API_URL = `http://${SERVER_HOST}:3000`;
+      const LIVEKIT_URL = `ws://${SERVER_HOST}:7880`;
+
+      console.log("Server configuration:", {
+        SERVER_HOST,
+        API_URL,
+        LIVEKIT_URL,
+      });
+
+      let room = null;
+
+      let livekitClientReady = false;
+
+      // Check if LivekitClient is loaded
+      function checkLivekitClient() {
+        if (typeof LivekitClient !== "undefined") {
+          livekitClientReady = true;
+          console.log("✓ LivekitClient library loaded successfully");
+          const statusEl = document.getElementById("library-status");
+          const textEl = document.getElementById("library-status-text");
+          if (statusEl && textEl) {
+            statusEl.style.display = "block";
+            statusEl.style.background = "#d4edda";
+            textEl.textContent = "✓ LiveKit client library loaded and ready";
+          }
+          return true;
+        }
+        return false;
+      }
+
+      // Wait for LivekitClient to be available before allowing connections
+      function ensureLivekitClientLoaded() {
+        if (!checkLivekitClient()) {
+          throw new Error(
+            "LivekitClient library not loaded. Please refresh the page or wait a moment."
+          );
+        }
+      }
+
+      // Check on page load
+      window.addEventListener("load", () => {
+        // Check immediately
+        if (!checkLivekitClient()) {
+          const statusEl = document.getElementById("library-status");
+          const textEl = document.getElementById("library-status-text");
+          if (statusEl && textEl) {
+            statusEl.style.display = "block";
+            statusEl.style.background = "#f8d7da";
+            textEl.textContent = "⏳ Loading LiveKit client library...";
+          }
+
+          // Check again after a delay
+          setTimeout(() => {
+            if (!checkLivekitClient()) {
+              console.error("✗ LivekitClient library failed to load");
+              if (statusEl && textEl) {
+                statusEl.style.background = "#f8d7da";
+                textEl.textContent =
+                  "✗ Failed to load. Please refresh the page.";
+              }
+              updateStatus(
+                "Disconnected",
+                "Error: LiveKit library not loaded. Please refresh the page."
+              );
+            }
+          }, 2000);
+        }
+      });
+
+      // Also check immediately
+      if (checkLivekitClient()) {
+        console.log("LivekitClient already loaded");
+      }
+
+      window.getTokenAndConnect = async function () {
+        const roomName = document.getElementById("roomName").value;
+        const participantName =
+          document.getElementById("participantName").value;
+
+        if (!roomName || !participantName) {
+          alert("Please enter both room name and participant name");
+          return;
+        }
+
+        updateStatus("Connecting", "Creating room and getting token...");
+
+        try {
+          // First, create the room
+          const roomResponse = await fetch(`${API_URL}/livekit/rooms`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: roomName }),
+          });
+
+          if (!roomResponse.ok && roomResponse.status !== 409) {
+            throw new Error("Failed to create room");
+          }
+
+          // Get access token
+          const tokenResponse = await fetch(`${API_URL}/livekit/token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              roomName: roomName,
+              participantName: participantName,
+              canPublish: true,
+              canSubscribe: true,
+            }),
+          });
+
+          if (!tokenResponse.ok) {
+            throw new Error("Failed to get token");
+          }
+
+          const { token } = await tokenResponse.json();
+          document.getElementById("token").value = token;
+
+          // Connect to room
+          await connect(LIVEKIT_URL, token);
+        } catch (error) {
+          updateStatus("Disconnected", `Error: ${error.message}`);
+          console.error("Error:", error);
+        }
+      };
+
+      window.connectWithToken = async function () {
+        let serverUrl = document.getElementById("serverUrl").value;
+        const token = document.getElementById("token").value;
+
+        // If server URL is empty, use auto-detected URL
+        if (!serverUrl) {
+          serverUrl = LIVEKIT_URL;
+          document.getElementById("serverUrl").value = serverUrl;
+        }
+
+        if (!token) {
+          alert("Please enter an access token");
+          return;
+        }
+
+        await connect(serverUrl, token);
+      };
+
+      // Set default server URL on page load
+      window.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("serverUrl").value = LIVEKIT_URL;
+      });
+
+      async function connect(serverUrl, token) {
+        updateStatus("Connecting", "Connecting to LiveKit server...");
+
+        try {
+          // Verify LivekitClient is available
+          ensureLivekitClientLoaded();
+
+          // Use LivekitClient for version 1.15.0
+          // Note: rtcConfig should be passed to connect(), not Room constructor
+          room = new LivekitClient.Room({
+            adaptiveStream: true,
+            dynacast: true,
+          });
+
+          // Event listeners
+          room.on("participantConnected", (participant) => {
+            console.log("Participant connected:", participant.identity);
+            updateStatus(
+              "Connected",
+              `Connected! Participants: ${room.participants.size + 1}`
+            );
+          });
+
+          room.on("participantDisconnected", (participant) => {
+            console.log("Participant disconnected:", participant.identity);
+            const element = document.getElementById(
+              `participant-${participant.sid}`
+            );
+            if (element) element.remove();
+          });
+
+          room.on("trackSubscribed", (track, publication, participant) => {
+            console.log("Track subscribed:", track.kind);
+            if (track.kind === "video" || track.kind === "audio") {
+              attachTrack(track, participant);
+            }
+          });
+
+          room.on("trackUnsubscribed", (track, publication, participant) => {
+            console.log("Track unsubscribed:", track.kind);
+            track.detach();
+          });
+
+          // Add connection state listeners for debugging
+          let connectionStateResolver = null;
+          room.on("connectionStateChanged", (state) => {
+            console.log("Connection state changed:", state);
+            if (state === "connected" && connectionStateResolver) {
+              const resolver = connectionStateResolver;
+              connectionStateResolver = null;
+              resolver(); // Resolve without error
+            } else if (state === "disconnected") {
+              if (connectionStateResolver) {
+                const resolver = connectionStateResolver;
+                connectionStateResolver = null;
+                resolver(
+                  new Error("Connection was disconnected during negotiation")
+                );
+              }
+              updateStatus("Disconnected", "Connection lost");
+            }
+          });
+
+          room.on("disconnected", (reason) => {
+            console.log("Disconnected from room:", reason);
+            updateStatus(
+              "Disconnected",
+              `Disconnected: ${reason || "Unknown reason"}`
+            );
+          });
+
+          // Connect to room with options
+          console.log("Connecting to:", serverUrl);
+          console.log("Token length:", token.length);
+          console.log("Token preview:", token.substring(0, 50) + "...");
+
+          // Connect with basic options (rtcConfig may not be supported in 1.15.0)
+          const connectOptions = {
+            autoSubscribe: true,
+          };
+
+          console.log("Connection options:", connectOptions);
+          console.log("Room object:", room);
+          console.log(
+            "LivekitClient version check:",
+            typeof LivekitClient.Room
+          );
+
+          // Add connection timeout
+          const connectPromise = room.connect(serverUrl, token, connectOptions);
+
+          // Add timeout wrapper (15 seconds for WebRTC negotiation)
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+              reject(
+                new Error(
+                  "Connection timeout after 15 seconds. WebRTC negotiation may be blocked."
+                )
+              );
+            }, 15000);
+          });
+
+          // Wait for WebSocket connection first
+          try {
+            await connectPromise;
+            console.log("✓ WebSocket connected successfully");
+          } catch (connectError) {
+            console.error("WebSocket connection error:", connectError);
+            throw connectError;
+          }
+
+          // Now wait for WebRTC connection to be established
+          // The connect() promise resolves when WebSocket connects, but WebRTC needs more time
+          console.log("WebSocket connected, waiting for WebRTC negotiation...");
+          updateStatus(
+            "Connecting",
+            "WebSocket connected, negotiating WebRTC connection..."
+          );
+
+          // Check if already connected (might happen quickly)
+          if (room.connectionState === "connected") {
+            console.log("✓ Already connected!");
+          } else {
+            // Wait for connection state to become 'connected' using event listener
+            const waitForConnected = new Promise((resolve, reject) => {
+              connectionStateResolver = (error) => {
+                if (error) {
+                  reject(error);
+                } else {
+                  resolve();
+                }
+              };
+
+              // Also set a timeout
+              setTimeout(() => {
+                if (connectionStateResolver) {
+                  const currentState = room.connectionState;
+                  connectionStateResolver = null;
+                  reject(
+                    new Error(
+                      `WebRTC negotiation timeout after 20 seconds. Current state: ${currentState}. This usually means ICE candidates are blocked by firewall/NAT. Check server logs for ICE failures.`
+                    )
+                  );
+                }
+              }, 20000);
+            });
+
+            try {
+              await Promise.race([waitForConnected, timeoutPromise]);
+            } catch (negotiationError) {
+              console.error("WebRTC negotiation error:", negotiationError);
+              throw negotiationError;
+            }
+          }
+
+          console.log("✓ Full connection established");
+          console.log("Room state:", room.state);
+          console.log("Connection state:", room.connectionState);
+          console.log("Room name:", room.name);
+          console.log("Local participant:", room.localParticipant?.identity);
+
+          updateStatus(
+            "Connected",
+            `Connected to room as ${room.localParticipant.identity}`
+          );
+          document.getElementById("disconnectBtn").disabled = false;
+
+          // Enable camera and microphone
+          try {
+            await room.localParticipant.enableCameraAndMicrophone();
+
+            // Attach local video
+            const localVideoTrack = room.localParticipant.videoTracks
+              .values()
+              .next().value;
+            if (localVideoTrack) {
+              attachTrack(localVideoTrack.track, room.localParticipant);
+            }
+          } catch (mediaError) {
+            console.warn(
+              "Media access error (may need permissions):",
+              mediaError
+            );
+            updateStatus(
+              "Connected",
+              `Connected but media access failed. Check browser permissions.`
+            );
+          }
+        } catch (error) {
+          console.error("=== CONNECTION ERROR DETAILS ===");
+          console.error("Error object:", error);
+          console.error("Error message:", error.message);
+          console.error("Error stack:", error.stack);
+          console.error("Error name:", error.name);
+          if (error.cause) {
+            console.error("Error cause:", error.cause);
+          }
+          console.error("================================");
+
+          let errorMessage = error.message || "Unknown error";
+
+          // Provide more helpful error messages
+          if (
+            errorMessage.includes("pc connection") ||
+            errorMessage.includes("WebRTC") ||
+            errorMessage.includes("ICE") ||
+            errorMessage.includes("peer connection")
+          ) {
+            errorMessage =
+              "WebRTC connection failed. This might be due to:\n" +
+              "1. LiveKit server WebRTC configuration\n" +
+              "2. Network/firewall blocking WebRTC\n" +
+              "3. Browser WebRTC restrictions\n\n" +
+              "Check browser console (F12) for detailed error messages.";
+          } else if (
+            errorMessage.includes("token") ||
+            errorMessage.includes("unauthorized") ||
+            errorMessage.includes("authentication")
+          ) {
+            errorMessage =
+              "Invalid or expired token. Please generate a new token.";
+          } else if (
+            errorMessage.includes("network") ||
+            errorMessage.includes("fetch") ||
+            errorMessage.includes("WebSocket") ||
+            errorMessage.includes("timeout")
+          ) {
+            errorMessage =
+              "Network error or timeout. Check if LiveKit server is running at " +
+              serverUrl +
+              ". Try refreshing the page.";
+          } else if (errorMessage.includes("Connection timeout")) {
+            // Keep timeout message as is
+          }
+
+          updateStatus("Disconnected", `Connection failed: ${errorMessage}`);
+        }
+      }
+
+      function attachTrack(track, participant) {
+        const videosContainer = document.getElementById("videos");
+
+        const existingContainer = document.getElementById(
+          `participant-${participant.sid}`
+        );
+        if (existingContainer) {
+          existingContainer.remove();
+        }
+
+        const container = document.createElement("div");
+        container.id = `participant-${participant.sid}`;
+        container.className = "video-container";
+
+        const element = track.attach();
+        container.appendChild(element);
+
+        const nameTag = document.createElement("div");
+        nameTag.className = "participant-name";
+        nameTag.textContent = participant.identity || "Unknown";
+        container.appendChild(nameTag);
+
+        videosContainer.appendChild(container);
+      }
+
+      window.disconnect = async function () {
+        if (room) {
+          await room.disconnect();
+          room = null;
+          document.getElementById("videos").innerHTML = "";
+          document.getElementById("disconnectBtn").disabled = true;
+          updateStatus("Disconnected", "Disconnected from room");
+        }
+      };
+
+      function updateStatus(state, message) {
+        const statusEl = document.getElementById("status");
+        statusEl.textContent = `Status: ${message}`;
+        statusEl.className = `status-${state.toLowerCase()}`;
+      }
+    </script>
+  </body>
+</html>
