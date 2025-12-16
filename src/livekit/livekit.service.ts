@@ -175,7 +175,9 @@ export class LivekitService implements OnModuleInit {
   /**
    * Create an access token for a participant to join a room
    */
-  async createToken(createTokenDto: CreateTokenDto): Promise<string> {
+  async createToken(
+    createTokenDto: CreateTokenDto,
+  ): Promise<{ token: string; testRoomUrl: string }> {
     try {
       const at = new AccessToken(this.apiKey, this.apiSecret, {
         identity: createTokenDto.participantName,
@@ -195,7 +197,11 @@ export class LivekitService implements OnModuleInit {
       this.logger.log(
         `Token created for ${createTokenDto.participantName} in room: ${createTokenDto.roomName}`,
       );
-      return token;
+
+      // Generate test room URL using the configured LiveKit server URL
+      const testRoomUrl = `https://meet.livekit.io/custom?liveKitUrl=${encodeURIComponent(this.livekitUrl)}&token=${encodeURIComponent(token)}`;
+
+      return { token, testRoomUrl };
     } catch (error) {
       this.logger.error(
         `Failed to create token: ${error.message}`,

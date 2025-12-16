@@ -16,15 +16,10 @@ Before running this project, you need to have a LiveKit server running locally.
 
 ### Installing and Running LiveKit Server
 
-#### Option 1: Using Docker (Recommended)
+#### Option 1: Using Cli (Recommended)
 
 ```bash
-docker run --rm -p 7880:7880 \
-  -p 7881:7881 \
-  -p 7882:7882/udp \
-  -e LIVEKIT_KEYS="devkey: secret" \
-  livekit/livekit-server \
-  --dev
+livekit-server --dev
 ```
 
 #### Option 2: Using Binary
