@@ -23,7 +23,7 @@ export class LivekitService {
   private readonly roomService: RoomServiceClient;
   private readonly egressClient: EgressClient;
   private readonly livekitUrl: string;
-  private readonly livekitInternalUrl: string; // For egress (Docker service name)
+  private readonly livekitInternalUrl: string;
   private readonly apiKey: string;
   private readonly apiSecret: string;
 

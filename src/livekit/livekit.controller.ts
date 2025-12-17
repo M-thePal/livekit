@@ -188,7 +188,7 @@ export class LivekitController {
   })
   async updateRoom(
     @Param("roomName") roomName: string,
-    @Body() updateRoomDto: UpdateRoomDto
+    @Body() updateRoomDto: UpdateRoomDto,
   ) {
     return this.livekitService.updateRoom(roomName, updateRoomDto);
   }
@@ -289,7 +289,7 @@ export class LivekitController {
   })
   async removeParticipant(
     @Param("roomName") roomName: string,
-    @Param("participantIdentity") participantIdentity: string
+    @Param("participantIdentity") participantIdentity: string,
   ) {
     await this.livekitService.removeParticipant(roomName, participantIdentity);
   }
@@ -499,14 +499,14 @@ export class LivekitController {
     @Param("roomName") roomName: string,
     @Param("participantIdentity") participantIdentity: string,
     @Query("trackSid") trackSid: string,
-    @Query("muted") muted: string
+    @Query("muted") muted: string,
   ) {
     const isMuted = muted === "true";
     await this.livekitService.muteParticipant(
       roomName,
       participantIdentity,
       trackSid,
-      isMuted
+      isMuted,
     );
     return { message: `Track ${isMuted ? "muted" : "unmuted"} successfully` };
   }
