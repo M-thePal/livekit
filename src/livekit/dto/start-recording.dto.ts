@@ -19,7 +19,10 @@ export enum RecordingPreset {
   FULL_HD_30 = "preset-full-hd-30",
   FULL_HD_60 = "preset-full-hd-60",
 }
-
+export enum RecordingType {
+  ROOM = "ROOM",
+  WEB = "WEB",
+}
 export class StartRecordingDto {
   @ApiProperty({
     description: "Name of the room to record",
@@ -28,6 +31,15 @@ export class StartRecordingDto {
   @IsString()
   @IsNotEmpty()
   roomName: string;
+
+  @ApiPropertyOptional({
+    description: "Recording type for the recording",
+    enum: RecordingType,
+    default: RecordingType.ROOM,
+    example: RecordingType.WEB,
+  })
+  @IsEnum(RecordingType)
+  recordingType: RecordingType;
 
   @ApiPropertyOptional({
     description: "Output format for the recording",

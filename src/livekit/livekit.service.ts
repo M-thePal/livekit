@@ -15,6 +15,8 @@ import {
   CreateTokenDto,
   UpdateRoomDto,
   StartRecordingDto,
+  RecordingOutputFormat,
+  RecordingType,
 } from "./dto";
 
 @Injectable()
@@ -35,15 +37,14 @@ export class LivekitService {
     // Internal URL for egress (uses Docker service name)
     this.livekitInternalUrl = this.configService.get<string>(
       "LIVEKIT_INTERNAL_URL",
-      this.livekitUrl, // Falls back to external URL if not set
+      "ws://livekit-server:7880", // Falls back to external URL if not set
     );
     this.apiKey = this.configService.get<string>("LIVEKIT_API_KEY", "devkey");
     this.apiSecret = this.configService.get<string>(
       "LIVEKIT_API_SECRET",
       "secret",
     );
-    // Egress connects to LiveKit server (same as RoomService)
-    // The Egress worker is a separate service that pulls jobs from Redis
+
     const livekitHttpUrl = this.livekitUrl
       .replace("ws://", "http://")
       .replace("wss://", "https://");
@@ -280,22 +281,27 @@ export class LivekitService {
     startRecordingDto: StartRecordingDto,
   ): Promise<{ egressId: string; status: string }> {
     try {
-      // Verify room exists
       const rooms = await this.roomService.listRooms([
         startRecordingDto.roomName,
       ]);
+
       if (rooms.length === 0) {
         throw new Error(`Room not found: ${startRecordingDto.roomName}`);
       }
 
       const outputFormat = startRecordingDto.outputFormat || "mp4";
-      const fileName = `${startRecordingDto.roomName}-${new Date().getTime()}`;
-      // Create encoded file output for recording
-      const fileType =
-        outputFormat === "mp4" ? 1 : outputFormat === "ogg" ? 2 : 3; // 1=MP4, 2=OGG, 3=WEBM
+      const fileName = `${startRecordingDto.roomName}-${Date.now()}`;
 
-      // Configure S3 upload if provided (MinIO or AWS S3)
-      let s3Config: S3Upload | undefined = undefined;
+      // 1 = MP4, 2 = OGG, 3 = WEBM
+      const fileType =
+        outputFormat === "mp4"
+          ? 1
+          : outputFormat === RecordingOutputFormat.OGG
+            ? 2
+            : 3;
+
+      let s3Config: S3Upload | undefined;
+
       if (startRecordingDto.s3Bucket) {
         s3Config = new S3Upload({
           accessKey: this.configService.get("S3_ACCESS_KEY", ""),
@@ -303,12 +309,12 @@ export class LivekitService {
           region: this.configService.get("S3_REGION", "us-east-1"),
           bucket: startRecordingDto.s3Bucket,
           endpoint: this.configService.get("S3_ENDPOINT", ""),
-          forcePathStyle: true, // Required for MinIO and other S3-compatible storage
+          forcePathStyle: true,
         });
       }
 
       const output = new EncodedFileOutput({
-        fileType: fileType,
+        fileType,
         filepath: `${fileName}.${outputFormat}`,
         output: s3Config
           ? {
@@ -318,55 +324,56 @@ export class LivekitService {
           : undefined,
       });
 
-      // Generate access token for egress to join the room
-      const egressIdentity = "egress-recorder-bot";
-      // const at = new AccessToken(this.apiKey, this.apiSecret, {
-      //   identity: egressIdentity,
-      //   name: egressIdentity,
-      // });
-      //
-      // at.addGrant({
-      //   room: startRecordingDto.roomName,
-      //   roomJoin: true,
-      //   canPublish: false, // Egress doesn't need to publish
-      //   canSubscribe: true, // Egress needs to subscribe to tracks
-      // });
-
-      // const token = await at.toJwt();
-      const token = (
-        await this.createToken({
-          roomName: startRecordingDto.roomName,
-          participantName: egressIdentity,
-          canSubscribe: true,
-          canPublish: false,
-          hidden: true,
-        })
-      ).token;
-      // Construct the full URL with token for web egress
-      // Use internal URL (Docker service name) for egress to connect properly
-      const roomUrl =
-        startRecordingDto.roomUrl ||
-        `https://meet.livekit.io/custom?liveKitUrl=${encodeURIComponent(this.livekitInternalUrl)}&token=${encodeURIComponent(token)}`;
-
-      // Options for web egress
+      // 4. Egress options
       const options = {
-        audioOnly: startRecordingDto.audioOnly || false,
-        videoOnly: startRecordingDto.videoOnly || false,
+        audioOnly: startRecordingDto.audioOnly ?? false,
+        videoOnly: startRecordingDto.videoOnly ?? false,
       };
 
-      // Start room composite egress (records entire room)
-      // const egressInfo = await this.egressClient.startRoomCompositeEgress(
-      //   startRecordingDto.roomName,
-      //   output,
-      //   options
-      // );
-      const egressInfo = await this.egressClient.startWebEgress(
-        roomUrl,
-        output,
-        options,
-      );
+      // 5. Start egress
+      let egressInfo: EgressInfo;
+      let roomUrl: string | undefined;
+
+      if (startRecordingDto.recordingType === RecordingType.WEB) {
+        const egressIdentity = "egress-recorder-bot";
+
+        const token = (
+          await this.createToken({
+            roomName: startRecordingDto.roomName,
+            participantName: egressIdentity,
+            canSubscribe: true,
+            canPublish: false,
+            hidden: true,
+          })
+        ).token;
+
+        roomUrl =
+          startRecordingDto.roomUrl ||
+          `https://meet.livekit.io/custom?liveKitUrl=${encodeURIComponent(
+            this.livekitInternalUrl,
+          )}&token=${encodeURIComponent(token)}`;
+
+        egressInfo = await this.egressClient.startWebEgress(
+          roomUrl,
+          output,
+          options,
+        );
+      } else {
+        egressInfo = await this.egressClient.startRoomCompositeEgress(
+          startRecordingDto.roomName,
+          output,
+          options,
+        );
+      }
+
       this.logger.log(
-        `Web Egress started for room ${startRecordingDto.roomName}, egress ID: ${egressInfo.egressId}, URL: ${roomUrl}`,
+        `${startRecordingDto.recordingType} Egress started for room ${
+          startRecordingDto.roomName
+        }, egress ID: ${egressInfo.egressId}${
+          startRecordingDto.recordingType === RecordingType.WEB && roomUrl
+            ? `, URL: ${roomUrl}`
+            : ""
+        }`,
       );
 
       return {
