@@ -1,34 +1,52 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   RoomServiceClient,
   AccessToken,
   Room,
   ParticipantInfo,
+  EgressClient,
+  EncodedFileOutput,
+  EgressInfo,
+  S3Upload,
 } from "livekit-server-sdk";
-import { CreateRoomDto, CreateTokenDto, UpdateRoomDto } from "./dto";
+import {
+  CreateRoomDto,
+  CreateTokenDto,
+  UpdateRoomDto,
+  StartRecordingDto,
+} from "./dto";
 
 @Injectable()
-export class LivekitService implements OnModuleInit {
+export class LivekitService {
   private readonly logger = new Logger(LivekitService.name);
   private readonly roomService: RoomServiceClient;
+  private readonly egressClient: EgressClient;
   private readonly livekitUrl: string;
+  private readonly livekitInternalUrl: string; // For egress (Docker service name)
   private readonly apiKey: string;
   private readonly apiSecret: string;
-  onModuleInit() {
-    console.log(this.apiKey);
-  }
 
   constructor(private configService: ConfigService) {
     this.livekitUrl = this.configService.get<string>(
       "LIVEKIT_URL",
       "ws://localhost:7880",
     );
+    // Internal URL for egress (uses Docker service name)
+    this.livekitInternalUrl = this.configService.get<string>(
+      "LIVEKIT_INTERNAL_URL",
+      this.livekitUrl, // Falls back to external URL if not set
+    );
     this.apiKey = this.configService.get<string>("LIVEKIT_API_KEY", "devkey");
     this.apiSecret = this.configService.get<string>(
       "LIVEKIT_API_SECRET",
       "secret",
     );
+    // Egress connects to LiveKit server (same as RoomService)
+    // The Egress worker is a separate service that pulls jobs from Redis
+    const livekitHttpUrl = this.livekitUrl
+      .replace("ws://", "http://")
+      .replace("wss://", "https://");
 
     this.roomService = new RoomServiceClient(
       this.livekitUrl,
@@ -36,6 +54,11 @@ export class LivekitService implements OnModuleInit {
       this.apiSecret,
     );
 
+    this.egressClient = new EgressClient(
+      livekitHttpUrl,
+      this.apiKey,
+      this.apiSecret,
+    );
     this.logger.log(`LiveKit service initialized with URL: ${this.livekitUrl}`);
   }
 
@@ -191,6 +214,7 @@ export class LivekitService implements OnModuleInit {
         canPublish: createTokenDto.canPublish !== false,
         canSubscribe: createTokenDto.canSubscribe !== false,
         canPublishData: createTokenDto.canPublishData !== false,
+        hidden: createTokenDto.hidden,
       });
 
       const token = await at.toJwt();
@@ -247,5 +271,174 @@ export class LivekitService implements OnModuleInit {
       url: this.livekitUrl,
       apiKey: this.apiKey,
     };
+  }
+
+  /**
+   * Start recording a room using Egress
+   */
+  async startRecording(
+    startRecordingDto: StartRecordingDto,
+  ): Promise<{ egressId: string; status: string }> {
+    try {
+      // Verify room exists
+      const rooms = await this.roomService.listRooms([
+        startRecordingDto.roomName,
+      ]);
+      if (rooms.length === 0) {
+        throw new Error(`Room not found: ${startRecordingDto.roomName}`);
+      }
+
+      const outputFormat = startRecordingDto.outputFormat || "mp4";
+      const fileName = `${startRecordingDto.roomName}-${new Date().getTime()}`;
+      // Create encoded file output for recording
+      const fileType =
+        outputFormat === "mp4" ? 1 : outputFormat === "ogg" ? 2 : 3; // 1=MP4, 2=OGG, 3=WEBM
+
+      // Configure S3 upload if provided (MinIO or AWS S3)
+      let s3Config: S3Upload | undefined = undefined;
+      if (startRecordingDto.s3Bucket) {
+        s3Config = new S3Upload({
+          accessKey: this.configService.get("S3_ACCESS_KEY", ""),
+          secret: this.configService.get("S3_SECRET_KEY", ""),
+          region: this.configService.get("S3_REGION", "us-east-1"),
+          bucket: startRecordingDto.s3Bucket,
+          endpoint: this.configService.get("S3_ENDPOINT", ""),
+          forcePathStyle: true, // Required for MinIO and other S3-compatible storage
+        });
+      }
+
+      const output = new EncodedFileOutput({
+        fileType: fileType,
+        filepath: `${fileName}.${outputFormat}`,
+        output: s3Config
+          ? {
+              case: "s3",
+              value: s3Config,
+            }
+          : undefined,
+      });
+
+      // Generate access token for egress to join the room
+      const egressIdentity = "egress-recorder-bot";
+      // const at = new AccessToken(this.apiKey, this.apiSecret, {
+      //   identity: egressIdentity,
+      //   name: egressIdentity,
+      // });
+      //
+      // at.addGrant({
+      //   room: startRecordingDto.roomName,
+      //   roomJoin: true,
+      //   canPublish: false, // Egress doesn't need to publish
+      //   canSubscribe: true, // Egress needs to subscribe to tracks
+      // });
+
+      // const token = await at.toJwt();
+      const token = (
+        await this.createToken({
+          roomName: startRecordingDto.roomName,
+          participantName: egressIdentity,
+          canSubscribe: true,
+          canPublish: false,
+          hidden: true,
+        })
+      ).token;
+      // Construct the full URL with token for web egress
+      // Use internal URL (Docker service name) for egress to connect properly
+      const roomUrl =
+        startRecordingDto.roomUrl ||
+        `https://meet.livekit.io/custom?liveKitUrl=${encodeURIComponent(this.livekitInternalUrl)}&token=${encodeURIComponent(token)}`;
+
+      // Options for web egress
+      const options = {
+        audioOnly: startRecordingDto.audioOnly || false,
+        videoOnly: startRecordingDto.videoOnly || false,
+      };
+
+      // Start room composite egress (records entire room)
+      // const egressInfo = await this.egressClient.startRoomCompositeEgress(
+      //   startRecordingDto.roomName,
+      //   output,
+      //   options
+      // );
+      const egressInfo = await this.egressClient.startWebEgress(
+        roomUrl,
+        output,
+        options,
+      );
+      this.logger.log(
+        `Web Egress started for room ${startRecordingDto.roomName}, egress ID: ${egressInfo.egressId}, URL: ${roomUrl}`,
+      );
+
+      return {
+        egressId: egressInfo.egressId,
+        status: egressInfo.status?.toString() || "EGRESS_STARTING",
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to start recording: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Stop an active recording
+   */
+  async stopRecording(egressId: string): Promise<EgressInfo> {
+    try {
+      const egressInfo = await this.egressClient.stopEgress(egressId);
+      this.logger.log(`Recording stopped, egress ID: ${egressId}`);
+      return egressInfo;
+    } catch (error) {
+      this.logger.error(
+        `Failed to stop recording ${egressId}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * List all active recordings (egress)
+   */
+  async listRecordings(roomName?: string): Promise<EgressInfo[]> {
+    try {
+      const egressList = await this.egressClient.listEgress(
+        roomName ? { roomName } : undefined,
+      );
+      this.logger.log(`Listed ${egressList.length} active recordings`);
+      return egressList;
+    } catch (error) {
+      this.logger.error(
+        `Failed to list recordings: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get recording status by egress ID
+   */
+  async getRecordingStatus(egressId: string): Promise<EgressInfo> {
+    try {
+      // List all egress and find the one with matching ID
+      const egressList = await this.egressClient.listEgress();
+      const egressInfo = egressList.find((e) => e.egressId === egressId);
+
+      if (!egressInfo) {
+        throw new Error(`Recording not found: ${egressId}`);
+      }
+
+      this.logger.log(`Retrieved recording status for egress ID: ${egressId}`);
+      return egressInfo;
+    } catch (error) {
+      this.logger.error(
+        `Failed to get recording status ${egressId}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 }

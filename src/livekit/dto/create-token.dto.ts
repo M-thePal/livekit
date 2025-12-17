@@ -1,25 +1,25 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class CreateTokenDto {
   @ApiProperty({
-    description: 'Name of the room to join',
-    example: 'my-meeting-room',
+    description: "Name of the room to join",
+    example: "my-meeting-room",
   })
   @IsString()
   @IsNotEmpty()
   roomName: string;
 
   @ApiProperty({
-    description: 'Unique identifier for the participant',
-    example: 'john-doe',
+    description: "Unique identifier for the participant",
+    example: "john-doe",
   })
   @IsString()
   @IsNotEmpty()
   participantName: string;
 
   @ApiPropertyOptional({
-    description: 'Custom metadata for the participant',
+    description: "Custom metadata for the participant",
     example: '{"role": "moderator", "avatar": "avatar-url"}',
   })
   @IsOptional()
@@ -27,7 +27,7 @@ export class CreateTokenDto {
   metadata?: string;
 
   @ApiPropertyOptional({
-    description: 'Whether the participant can publish audio/video',
+    description: "Whether the participant can publish audio/video",
     example: true,
     default: true,
   })
@@ -36,7 +36,7 @@ export class CreateTokenDto {
   canPublish?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Whether the participant can subscribe to other tracks',
+    description: "Whether the participant can subscribe to other tracks",
     example: true,
     default: true,
   })
@@ -45,12 +45,20 @@ export class CreateTokenDto {
   canSubscribe?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Whether the participant can publish data messages',
+    description: "Whether the participant can publish data messages",
     example: true,
     default: true,
   })
   @IsOptional()
   @IsBoolean()
   canPublishData?: boolean;
-}
 
+  @ApiPropertyOptional({
+    description: "Whether the participant is hidden or not",
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  hidden?: boolean;
+}

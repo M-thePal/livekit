@@ -8,21 +8,42 @@ A NestJS application for controlling and managing a local LiveKit server. This p
 - **Participant Management**: List participants, remove participants from rooms
 - **Access Token Generation**: Generate JWT tokens for participants to join rooms
 - **Track Control**: Mute/unmute participant tracks
+- **Room Recording**: Start/stop recordings with LiveKit Egress, save to MinIO/S3
+- **Swagger Documentation**: Interactive API documentation at `/api`
 - **REST API**: Easy-to-use REST endpoints for all LiveKit operations
 
 ## 📋 Prerequisites
 
-Before running this project, you need to have a LiveKit server running locally.
+You can run LiveKit infrastructure either manually or using Docker Compose (recommended).
 
-### Installing and Running LiveKit Server
+### Option 1: Docker Compose (Recommended)
 
-#### Option 1: Using Cli (Recommended)
+The easiest way to run the complete infrastructure:
+
+```bash
+# Quick start (one command)
+./start-infrastructure.sh
+
+# Or manually
+docker-compose up -d
+```
+
+Then:
+1. Create MinIO bucket at http://localhost:9001 (username/password)
+2. Copy `.env.default` to `.env`
+3. Run `npm run start:dev`
+
+📖 See [QUICKSTART_DOCKER.md](QUICKSTART_DOCKER.md) for step-by-step guide or [DOCKER_SETUP.md](DOCKER_SETUP.md) for detailed configuration.
+
+### Option 2: Manual Setup
+
+#### Using LiveKit CLI
 
 ```bash
 livekit-server --dev
 ```
 
-#### Option 2: Using Binary
+#### Using Binary
 
 1. Download the latest LiveKit server from [GitHub Releases](https://github.com/livekit/livekit/releases)
 2. Create a config file `livekit.yaml`:
@@ -214,11 +235,20 @@ npm run format
 
 ## 📖 Additional Resources
 
+### Documentation Files
+- **[Quick Start (Docker)](QUICKSTART_DOCKER.md)** - Get started in 5 minutes
+- **[Environment Variables Guide](ENV_GUIDE.md)** - Understanding LIVEKIT_URL vs LIVEKIT_INTERNAL_URL
+- **[MinIO Setup Guide](MINIO_SETUP.md)** - Set up S3-compatible storage for recordings
+- **[Recording Guide](RECORDING_GUIDE.md)** - Complete guide to room recording features
+- **[Mobile Testing Guide](MOBILE_TESTING.md)** - Test LiveKit on your mobile device
+- **[Swagger Guide](SWAGGER_GUIDE.md)** - Using the API documentation
+
+### External Links
 - **Swagger API Docs**: `http://localhost:3000/api`
 - [LiveKit Documentation](https://docs.livekit.io/)
 - [LiveKit Server SDK](https://github.com/livekit/server-sdk-js)
 - [NestJS Documentation](https://docs.nestjs.com)
-- [Swagger/OpenAPI](https://swagger.io/)
+- [MinIO Documentation](https://min.io/docs/minio/linux/index.html)
 
 ## 🤝 Support
 

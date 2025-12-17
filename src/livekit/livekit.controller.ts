@@ -19,7 +19,12 @@ import {
   ApiBody,
 } from "@nestjs/swagger";
 import { LivekitService } from "./livekit.service";
-import { CreateRoomDto, CreateTokenDto, UpdateRoomDto } from "./dto";
+import {
+  CreateRoomDto,
+  CreateTokenDto,
+  UpdateRoomDto,
+  StartRecordingDto,
+} from "./dto";
 
 @ApiTags("livekit")
 @Controller("livekit")
@@ -183,7 +188,7 @@ export class LivekitController {
   })
   async updateRoom(
     @Param("roomName") roomName: string,
-    @Body() updateRoomDto: UpdateRoomDto,
+    @Body() updateRoomDto: UpdateRoomDto
   ) {
     return this.livekitService.updateRoom(roomName, updateRoomDto);
   }
@@ -284,7 +289,7 @@ export class LivekitController {
   })
   async removeParticipant(
     @Param("roomName") roomName: string,
-    @Param("participantIdentity") participantIdentity: string,
+    @Param("participantIdentity") participantIdentity: string
   ) {
     await this.livekitService.removeParticipant(roomName, participantIdentity);
   }
@@ -327,6 +332,125 @@ export class LivekitController {
   async createToken(@Body() createTokenDto: CreateTokenDto) {
     return await this.livekitService.createToken(createTokenDto);
   }
+
+  /**
+   * POST /livekit/recordings/start
+   * Start recording a room
+   */
+  @Post("recordings/start")
+  @ApiOperation({
+    summary: "Start room recording",
+    description:
+      "Starts recording a room using LiveKit Egress. Moderators can start recording at any time.",
+  })
+  @ApiBody({ type: StartRecordingDto })
+  @ApiResponse({
+    status: 200,
+    description: "Recording started successfully",
+    schema: {
+      type: "object",
+      properties: {
+        egressId: {
+          type: "string",
+          example: "EG_xxxxx",
+          description: "Unique identifier for the recording session",
+        },
+        status: {
+          type: "string",
+          example: "EGRESS_STARTING",
+          description: "Current status of the recording",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: "Invalid request data",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Room not found",
+  })
+  async startRecording(@Body() startRecordingDto: StartRecordingDto) {
+    return await this.livekitService.startRecording(startRecordingDto);
+  }
+
+  /**
+   * POST /livekit/recordings/:egressId/stop
+   * Stop an active recording
+   */
+  @Post("recordings/:egressId/stop")
+  @ApiOperation({
+    summary: "Stop recording",
+    description: "Stops an active recording session",
+  })
+  @ApiParam({
+    name: "egressId",
+    description: "Egress ID of the recording to stop",
+    example: "EG_xxxxx",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Recording stopped successfully",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Recording not found",
+  })
+  async stopRecording(@Param("egressId") egressId: string) {
+    return await this.livekitService.stopRecording(egressId);
+  }
+
+  /**
+   * GET /livekit/recordings
+   * List all active recordings
+   */
+  @Get("recordings")
+  @ApiOperation({
+    summary: "List recordings",
+    description:
+      "Lists all active and completed recordings. Optionally filter by room name.",
+  })
+  @ApiQuery({
+    name: "roomName",
+    required: false,
+    description: "Filter recordings by room name",
+    example: "my-room",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "List of recordings retrieved successfully",
+  })
+  async listRecordings(@Query("roomName") roomName?: string) {
+    return await this.livekitService.listRecordings(roomName);
+  }
+
+  /**
+   * GET /livekit/recordings/:egressId
+   * Get recording status
+   */
+  @Get("recordings/:egressId")
+  @ApiOperation({
+    summary: "Get recording status",
+    description: "Gets the current status and details of a recording session",
+  })
+  @ApiParam({
+    name: "egressId",
+    description: "Egress ID of the recording",
+    example: "EG_xxxxx",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Recording status retrieved successfully",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Recording not found",
+  })
+  async getRecordingStatus(@Param("egressId") egressId: string) {
+    return await this.livekitService.getRecordingStatus(egressId);
+  }
+
   /**
    * POST /livekit/rooms/:roomName/participants/:participantIdentity/mute
    * Mute a participant's track
@@ -375,14 +499,14 @@ export class LivekitController {
     @Param("roomName") roomName: string,
     @Param("participantIdentity") participantIdentity: string,
     @Query("trackSid") trackSid: string,
-    @Query("muted") muted: string,
+    @Query("muted") muted: string
   ) {
     const isMuted = muted === "true";
     await this.livekitService.muteParticipant(
       roomName,
       participantIdentity,
       trackSid,
-      isMuted,
+      isMuted
     );
     return { message: `Track ${isMuted ? "muted" : "unmuted"} successfully` };
   }
